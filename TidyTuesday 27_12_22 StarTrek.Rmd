@@ -1,0 +1,254 @@
+---
+title: "Tidy tuesday"
+author: "Dr Richard Clarke"
+date: "2022-12-27"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Packages
+```{r}
+library(tidyverse)
+library(rtrek) # contains the data set also some of themes to use with ggplot
+library(hrbrthemes) # pretties up some of the graphs
+library(ggrepel) # for labeling data point
+library(tidytext) # for text analysis
+library(stringr) # for missing data (I think?)
+
+```
+
+```{r, loading the data}
+
+tlEvents <- rtrek::tlEvents
+
+# To check the functions and data that exists in a package type the following and use auto complete
+
+rtrek::
+
+```
+
+
+```{r, Basic exploration and recoding}
+tlEvents %>%
+  group_by(series) %>%
+  summarise(n = n())
+
+# "DS(" clearly needs to be recoded to "DS9" 
+
+# I decided to separate out the series I know from the ones I don't 
+
+timeline <- tlEvents %>%
+  filter(series %in% c("ENT", "TOS", "TNG", "DS9","VOY")) # note the use of %in% instead of == and |. Took me ages to work this out
+
+unknown <- tlEvents %>%
+  filter(series %in% c("CHG", "CT", "DTI", "IKE", "NF", "SCE", "SG", "TIT", "TLE", "SNW"))
+
+# The ones I dont know are mostly books. SNW is Strange new worlds. I know nothing of this series but apparently there's a lot going on in it. The data set seems to be missing some of the newer series, e.g. Discovery and Picard
+
+# going to stay with the 5 series I know.
+
+# The following re labels each of the variables with a readable name and also recodes that DS9 typo
+timeline <- timeline %>%
+  mutate(series = recode(series, 
+                        ENT = "Enteprise",
+                        TOS = "Original Series",
+                        TNG = "The Next Generation",
+                        `DS)` = "Deep Space 9",
+                        DS9 = "Deep Space 9",
+                        VOY = "Voyager"))
+```
+
+```{r, which series has the most "events" in it?}
+
+# the following creates the data needed to answer this question
+
+fig1 <- timeline %>%
+  group_by(series) %>%
+  summarise(`Number of events` = n()) 
+
+# the answer to the question is the original series, but its always nice to put data like this into a figure 
+
+fig1 %>%
+  ggplot(aes(x = `Number of events`, y = series)) +
+  geom_col()
+
+# this can be tidied up a bit.
+# 1. the column would look better if they were reordered
+# 2. Title and remove the redundant y-axis label
+# 3. Make it look more spacey 
+
+fig1 %>%
+  ggplot(aes(x = `Number of events`, y = reorder(series, `Number of events`), fill = series)) +
+  geom_col(show.legend = FALSE) +
+  labs(title = "Number of significant events mentioned in each of the 5 original Star Trek series") +
+  ylab(label = "") +
+  xlab(label = "Number of discrete significant events that are mentioned by characters or appear on screen") +
+  theme_ft_rc() +
+  scale_fill_ipsum()
+
+# click the zoom button to view properly
+
+```
+
+```{r}
+# how does the time line look for each series?
+
+fig2 <- timeline 
+
+fig2 %>%
+  ggplot(aes(x = year, y = series)) +
+  geom_point()
+
+# Terrible, if we just take the full dataset. No doubt the original series visited the beginning of the universe or something. Let's check! 
+
+far_history<- timeline %>%
+  filter(year < 0)
+
+View(far_history)
+
+# Ah I see, it was the death of the dinosaurs by an asteroid.
+
+# Maybe if the scale is logarithmic it could look a little better
+
+
+fig2 %>%
+  ggplot(aes(x = year, y = series)) +
+  geom_point() +
+  scale_x_log10()
+
+# Nope, something went weird there. Instead of working out what, lets go down a different path instead.
+
+# Can we get something more meaningful if we remove that case (and all the other 5 far history cases) from our dataset
+
+fig2 %>%
+  filter(year > 0) %>%
+  ggplot(aes(x = year, y = series)) +
+  geom_point() 
+
+# better, if still a little clustered for the main bulk of the data. Maybe this would work well for a figure where those extreme points are annotated
+
+# let's see what those extreme points are and then write a label for each of them based of the info section
+
+outliers <- fig2 %>% 
+  filter(year > 0 & year <1000 | year >2800)
+
+# from a look of it the back in time ones are some parts of Romulan history and the 3000 one is an alternate future. I remember that one, something to do with a temporal cold war.   
+
+fig2 <- fig2 %>%
+  mutate(weird = ifelse(year > 0 & year <1000, "Romulan history",
+                        ifelse(year > 2800, "Alternate future", NA))) # this is whats know as a nested ifelse. I found out how to do this here: https://www.statology.org/nested-ifelse-in-r/
+
+# Run the plot and tidy it up a little. 
+
+fig2 %>%
+  filter(year > 0) %>%
+  ggplot(aes(x = year, y = series)) +
+  geom_point() +
+  labs(title = "Timeline of significant events in the Star Trek universe") +
+  ylab(label = "") +
+  xlab(label = "Earth Year (Commmon Era)") +
+  geom_text_repel(aes(label = weird), size = 2.5, colour = "white") +
+  theme_modern_rc()
+  
+```
+
+Could we add to this data set by doing some text analysis on the info variable. We could pull out any mentions of species (other than human)
+
+```{r, basic text analyis}
+
+# we've not yet made use of the info variable. Lots of informative text in there.
+
+# one, very rough, thing we could do is identify how often each of the main species in Star Trek (other than humans) are mentioned across events. 
+
+# the rtrek package has a list of the main species in one of the files. There's some other data in that file but we just need the species names and can do so with the following. 
+
+species <- rtrek::stSpecies %>%
+  select(species)
+
+# we then need to break down the info variable in to seperate words. We can do that with the package tidytext
+
+# this give a new line for each word in the info variable
+
+unnested_timeline <- timeline %>%
+  unnest_tokens(word, info)
+
+# we can then group by the word 
+
+text1 <- unnested_timeline %>%
+  group_by(word) %>%
+  summarise(n = n())
+
+# lets take a quick look at the most common words in the dataset (just for fun)
+
+text1 %>%
+  arrange(desc(n))
+
+# hey would you look at that, enterprise sneaks into the top ten
+
+# back to the data. Let's select out just the species names 
+
+text2 <- text1 %>%
+  filter(word %in% c("human", "romulan", "klingon", "breen", "ferengi", "cardassian", "tholian", "tzenkethi", "talarian"))
+
+# and then turn it into a bar graph using the same code from earlier (with a bit of editing)
+text2 %>%
+  mutate(word = recode(word, 
+                       human = "Human*",
+                       romulan = "Romulan",
+                       klingon = "Klingon",
+                       ferengi = "Ferengi",
+                       cardassian = "Cardassian")) %>%
+  ggplot(aes(x = n, y = reorder(word, n), fill = word)) +
+  geom_col(show.legend = FALSE) +
+  labs(title = "Number of times a species is mentioned in a significant event in the Star Trek universe",
+       subtitle = "Across the 5 original Star Trek series",
+       caption = "*not representative due to the human-centric narrative of Star Trek") +
+  ylab(label = "") +
+  xlab(label = "Number of times species is mentioned in a significant event") +
+  theme_ft_rc() +
+  scale_fill_brewer()
+```
+
+
+```{r, adding species data to dataset}
+
+# is there a way to create a label for each event that gives an indication of if the species is mentioned in that event?
+
+# I didn't quite figure this out. Here are my notes for this. 
+
+unnested_timeline2 <- unnested_timeline %>%
+  mutate(species = recode(word, 
+                          "human" = "Human",
+                          "romulan" = "Romulan",
+                          "klingon" = "Klingon",
+                          "ferengi" = "Ferengi", 
+                          "cardassian" = "Cardassian",
+                          .default = "NA")) # .default cant be a true NA so will recode in next line
+
+
+unnested_timeline2 <- unnested_timeline2 %>%
+  mutate(across("species", str_replace, "NA", ""))
+
+unnested_timeline2 <- unnested_timeline2 %>% 
+  mutate_all(na_if,"")
+
+# probably an easier way to do this^ but it seems to work. I always struggle with missing data.
+
+unnested_timeline2 %>%
+  group_by(species) %>%
+  summarise(n = n())
+
+timeline3 <- unnested_timeline2 %>%
+  filter(species %in% c("Human", "Romulan", "Klingon", "Ferengi", "Cardassian"))
+
+test <- timeline3 %>%
+  group_by(source) %>%
+  summarise(count = n())
+
+# Ahh, multiple species for a single event. I could just take the first named species for each but I cant seem to figure that out right now. Future me, maybe see if you can. 
+
+```
+
+
+
