@@ -1,0 +1,189 @@
+---
+title: "TidyTuesday 10_1_23"
+author: "Richard Clarke"
+date: "09/01/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, packages}
+library(tidyverse)
+library(maps) # map for fig 1-3 
+library(showtext) # for font change
+library(sf) # map for fig 4
+
+```
+
+
+```{r, reading in the data}
+
+# imports the #TidyTuesday data 
+
+feederwatch <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-01-10/PFW_2021_public.csv')
+site_data <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-01-10/PFW_count_site_data_public_2021.csv')
+
+# other data sets used:
+## species name:  https://drive.google.com/file/d/1kHmx2XhA2MJtEyTNMpwqTQEnoa9M7Il2/view
+## state code to name: https://worldpopulationreview.com/states/state-abbreviations 
+
+```
+
+```{r, import fonts}
+
+font_add_google("Indie Flower", "indie")
+
+showtext_auto()
+
+# useful guide on fonts: https://r-graph-gallery.com/custom-fonts-in-R-and-ggplot2.html
+
+```
+
+
+```{r, map wranggling}
+
+# for choropleth maps (fig 1-3)
+
+map <- map_data("state") %>%
+  rename("state" = region)
+
+ggplot(map, aes(x = long, y = lat, group = group)) +
+  geom_polygon(fill = "white", colour = "black")
+
+statenames <- read_csv("state names.csv") %>%
+  mutate(state = tolower(state))
+
+map <- left_join(map, statenames, by = "state") 
+
+# for point map (fig 4)
+
+map2 <- map("state", plot = FALSE, fill = TRUE) %>%
+  st_as_sf() %>%
+  rename("state" = ID)
+
+map2 <- left_join(map2, statenames, by = "state")
+```
+
+```{r, number of sites per state}
+
+obs_per_site <- feederwatch %>%
+  separate(subnational1_code, into = c("country", "code"), sep = "-") %>%
+  filter(country == "US") %>%
+  group_by(loc_id, code) %>%
+  summarise(obs_per_site = n())
+
+n_sites_by_state <- obs_per_site %>%
+  group_by(code) %>%
+  summarise(sites_per_state = n())
+
+n_sites_by_state <- left_join(n_sites_by_state, statenames, by = "code") %>%
+  select(!abbrev)
+
+n_sites_by_state <- left_join(n_sites_by_state, map, by = "code") %>%
+  filter(!code %in% c("AK", "HI"))
+
+n_sites_by_state %>%
+  ggplot(aes(x = long, y = lat, group = group, fill = sites_per_state)) +
+  geom_polygon(colour = "black") +
+  scale_fill_viridis_c(name = "Number of survey sites") +
+  theme_void() +
+  labs(title = "Number of Unique Project FeederWatch Survey Sites per State",
+       subtitle = " - New York state has the most registered survey sites",
+       caption = "Data: Project FeederWatch | #TidyTuesday | @richclarkepsy") +
+  theme(text = element_text(size = 18, family = "indie"),
+        plot.margin = margin(l = 20, r = 40, t = 10, b = 10))
+
+```
+
+```{r, number of sightings by state}
+
+sightings_per_state <- feederwatch %>%
+  separate(subnational1_code, into = c("country", "code"), sep = "-") %>%
+  filter(country == "US") %>%
+  group_by(code) %>%
+  summarise(sightings = sum(how_many))
+
+sightings_per_state <- left_join(sightings_per_state, statenames, by = "code") %>%
+  select(!abbrev)
+
+sightings_per_state <- left_join(sightings_per_state, map, by = "code") %>%
+  filter(!code %in% c("AK", "HI"))
+
+sightings_per_state %>%
+  ggplot(aes(x = long, y = lat, group = group, fill = sightings)) +
+  geom_polygon(colour = "black") +
+  scale_fill_viridis_c(name = "Sightings") +
+    theme_void() +
+  labs(title = "Number of Bird Sightings per State (Nov 2020 - March 2021)",
+       subtitle = " - New York state is spotting the most birds",
+       caption = "Data: Project FeederWatch | #TidyTuesday | @richclarkepsy") +
+  theme(text = element_text(size = 18, family = "indie"),
+        plot.margin = margin(l = 20, r = 60, t = 10, b = 10))
+```
+
+```{r, rate of sightings per site}
+
+sighting_per_site <- feederwatch %>%
+  separate(subnational1_code, into = c("country", "code"), sep = "-") %>%
+  filter(country == "US") %>%
+  group_by(loc_id, code) %>%
+  summarise(sightings = sum(how_many))
+
+ave_sighting_per_state <- sighting_per_site %>%
+  group_by(code) %>%
+  summarise(rate = mean(sightings))
+
+ave_sighting_per_state <- left_join(ave_sighting_per_state, statenames, by = "code") %>%
+  select(!abbrev)
+
+ave_sighting_per_state <- left_join(ave_sighting_per_state, map, by = "code") %>%
+  filter(!code %in% c("AK", "HI"))
+
+ave_sighting_per_state %>%
+  ggplot(aes(x = long, y = lat, group = group, fill = rate)) +
+  geom_polygon(colour = "black") +
+  scale_fill_viridis_c("Sighitings per site") +
+   theme_void() +
+  labs(title = "Rate of Bird Sightings per State",
+       subtitle = " - Wyoming is sparse but doing a stellar bird spotting job!",
+       caption = "Data: Project FeederWatch | #TidyTuesday | @richclarkepsy") +
+  theme(text = element_text(size = 18, family = "indie"),
+        plot.margin = margin(l = 20, r = 40, t = 10, b = 10))
+
+```
+
+```{r, types of bluebirds and their location}
+
+species_data <- read_csv("FeederWatch_species_data.csv") 
+
+species_data <- species_data %>%
+  select(SPECIES_CODE, SCI_NAME, PRIMARY_COM_NAME) %>%
+  rename(species_code = SPECIES_CODE, 
+         name = PRIMARY_COM_NAME,
+         sci_name = SCI_NAME)
+
+feederwatch <- left_join(feederwatch, species_data, by = "species_code")
+
+bluebird_sightings <- feederwatch %>%
+  group_by(loc_id, subnational1_code, latitude, longitude, name) %>%
+  filter(str_detect(name,"Bluebird")) %>%
+  summarise(n_birds = sum(how_many, na.rm = TRUE))
+
+bluebird_sightings_US  <- bluebird_sightings %>%
+  separate(subnational1_code, into = c("country", "code"), sep = "-") %>%
+  filter(country == "US")
+
+bluebird_sightings_US %>%
+  ggplot() +
+  geom_sf(data = map2, ) +
+    geom_point(aes(longitude, latitude, size = n_birds, colour = name), alpha = 0.75) +
+  theme_void() +
+  scale_colour_viridis_d("", begin = 0.25, end = 0.90) +
+  labs(title = "Western Bluebirds need to up their game!",
+       subtitle = " - or this is just the base rate fallacy?",
+       caption = "Data: Project FeederWatch | #TidyTuesday | @richclarkepsy",
+       size = "Number of sightings") +
+  theme(text = element_text(size = 18, family = "indie"),
+        plot.margin = margin(l = 10, r = 33))
+
+```
