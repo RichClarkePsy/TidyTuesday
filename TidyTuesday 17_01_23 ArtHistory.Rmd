@@ -1,0 +1,69 @@
+---
+title: "TidyTuesday 17/01/23 ArtHistory"
+author: "Dr Richard Clarke"
+date: "17/01/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, packages}
+
+library(tidyverse)
+library(arthistory)
+library(treemapify)
+library(showtext)
+library(gganimate)
+library(ggtext)
+
+```
+
+
+```{r, importing that data and font}
+
+works_gardner<- arthistory::worksgardner
+
+font_add_google("Rufina", "rufina")
+
+showtext_auto()
+
+```
+
+```{r, page area over time}
+
+treemap_dat <- works_gardner %>%
+  mutate(artist_race = ifelse(artist_race =="White", "White", "Non-White")) %>%
+  mutate(artist_gender = ifelse(artist_gender == "N/A", NA, artist_gender)) %>%
+  drop_na() %>%
+  group_by(publication_year, edition_number, artist_race, artist_gender) %>%
+  summarise(sum = sum(area_of_work_in_book)) %>%
+  mutate(gen_race = paste(artist_gender, "&", artist_race))
+
+treemap_dat <- treemap_dat %>%
+  group_by(publication_year, edition_number, gen_race) %>%
+  summarise(n = sum(sum)) %>%
+  mutate(percentage = n / sum(n))
+
+sub_title <- "Edition number: {frame_time}"
+
+caption <- "Data: arthistory | #TidyTuesday |@richclarkepsy"
+
+treemap_dat %>%
+  ggplot(aes(area = percentage, fill = gen_race, label = gen_race)) +
+  geom_treemap(position = "identity") +
+  geom_treemap_text(grow = TRUE, 
+                    place = "center", 
+                    size = 18, 
+                    colour = "white") +
+  labs(title = "Area of Gardner's Art Through the Ages devoted to 
+  women and non-white artists (1926 & 2020)",
+       subtitle = sub_title, 
+       caption = caption) +
+  theme(legend.title=element_blank(),
+        text = element_text (family = "rufina", lineheight = 1.2),
+        plot.margin = margin(l = 20, r = 60, t = 10, b = 10)) +
+  scale_fill_manual(values = c('#510D9A', '#264653', '#C28E0A', '#510D0A')) +
+  transition_time(as.integer(edition_number)) 
+  
+```
+ 
