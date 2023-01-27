@@ -1,0 +1,138 @@
+---
+title: "TidyTuesdy 24/01/23"
+author: "Richard Clarke"
+date: "24/01/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+```{r, packages}
+library(tidyverse)
+library(ggpubr) # for comparison test
+library(ggtext)
+library(stringr) # for text wrap in caption
+library(naniar)
+
+```
+
+
+```{r, read in data and font}
+survivalists <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-01-24/survivalists.csv')
+
+```
+
+
+```{r, recoding}
+
+survivalists_not_4 <- survivalists %>%
+  filter(!season == 4) %>%  
+  mutate(win_lose = recode(result, 
+                           "1" = "Winner",
+                           "2" = "Runnerup",
+                           "3" = "The pack",
+                           "4" = "The pack",
+                           "5" = "The pack",
+                           "6" = "The pack",
+                           "7" = "The pack",
+                           "8" = "The pack",
+                           "9" = "The pack",
+                           "10" = "1st out"))
+
+
+survivalists4 <- survivalists %>%
+  filter(season == 4) %>% 
+  mutate(win_lose = recode(result, 
+                           "1" = "Winner",
+                           "2" = "Runnerup",
+                           "3" = "The pack",
+                           "4" = "The pack",
+                           "5" = "The pack",
+                           "6" = "The pack",
+                           "7" = "1st out"))
+
+survivalists_recoded <- rbind(survivalists_not_4, survivalists4) %>%
+  mutate(evac = ifelse(medically_evacuated == TRUE, "Medically Evacuated", NA))
+
+```
+
+
+```{r, statistical assumption checks}
+# packages for analysis
+library(broom)
+library(car) # for levene test
+
+# Normality check for full sample
+survivalists_recoded %>%
+  ggplot(aes(x=days_lasted)) +
+  geom_histogram(bins = 25)
+
+swtest <- shapiro.test(survivalists_recoded$days_lasted) %>% tidy()
+
+# Normality check by condition
+
+## Male
+survivalists_recoded %>%
+  filter(gender == "Female") %>%
+  ggplot(aes(x=days_lasted)) +
+  geom_histogram(bins = 25)
+
+swmale <- survivalists_recoded %>%
+  filter(gender == "Male")
+
+swtest_male <- shapiro.test(swmale1$days_lasted) %>% tidy()
+
+swtest_male <- swtest_male %>%
+  mutate(p.value = round(p.value, digits = 3)) 
+
+## Female
+
+survivalists_recoded %>%
+  filter(gender == "Female") %>%
+  ggplot(aes(x=days_lasted)) +
+  geom_histogram(bins = 25)
+
+swfemale <- survivalists_recoded %>%
+  filter(gender == "Female")
+
+swtest_female <- shapiro.test(swfemale$days_lasted) %>% tidy()
+
+swtest_female <- swtest_female %>%
+  mutate(p.value = round(p.value, digits = 3)) 
+
+# levene test for homogeneity of variance
+
+lev_test <- leveneTest(days_lasted ~ gender, survivalists_recoded) %>% tidy()
+
+lev_test <- lev_test %>%
+  mutate(p.value = round(p.value, digits = 3),
+         statistic = round(statistic, digits = 2))
+
+# Homogeneity of variance assumption met but normal distribution violated
+
+```
+
+```{r, text for caption}
+
+caption <- "Homogeneity of variance was tested through the use of of the Levene's test. The Levene's test yielded a result of (p=.997) This indicates that our data met the statistical assumption for homogeneity of variance. The Shapiro-Wilk's test yielded a p-value p<.0001 for the sample as a whole assumption of normality has been violated. As such a nonparametric test is conducted. \n Data: Alone (shared by Dan Oehm) | Image created: @richclarkepsy | #tidytuesday"
+
+```
+
+```{r}
+survivalists_recoded %>%
+  ggplot(aes(x=gender, y=days_lasted)) +
+  geom_boxplot() +
+  geom_jitter(aes(colour = win_lose), width = .1) +
+  scale_colour_manual(values=c("#d55d22", "#7da0c1", "#999999", "#7f618a")) +
+  theme_classic()+ 
+  stat_compare_means(method = "wilcox.test", paired = FALSE) +  
+  scale_y_continuous(name = "Number of days lasted") +
+  scale_x_discrete(name = "") +
+  labs(title = "Female contestants survived significantly longer\nthan male contestants",
+       subtitle = "An analysis of **The History channel** series *Alone* (N = 94) <br>",
+       caption = str_wrap(caption)) +
+  theme(plot.subtitle = element_markdown(lineheight = 1.2),
+        plot.title = element_text(),
+        plot.caption = element_text(hjust = 0, lineheight = 1.2, size = 8),
+        legend.title = element_blank())
+  
+```
