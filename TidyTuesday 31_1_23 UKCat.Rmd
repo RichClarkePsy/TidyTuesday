@@ -1,0 +1,92 @@
+---
+title: "TidyTuesday 31_1_23 UKCat"
+author: "Dr Richard Clarke"
+date: "2023-01-31"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+
+library(tidyverse)
+library(ggmap)
+library(showtext)
+library(ggtext)
+library(gt)
+```
+
+```{r, importing and cleaning}
+cats_uk <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-01-31/cats_uk.csv')
+cats_uk_reference <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-01-31/cats_uk_reference.csv')
+```
+
+```{r, google map with travel patterns for selected cats}
+
+title <- "A Week in the Life of Carrots, Frank and Smudge"
+
+caption <- "Data: Movebank | #TidyTuesday | @richclarkepsy"
+
+CTS <- cats_uk %>%
+  filter(tag_id %in% c("Carrots-Tag", "Frank-Tag", "Smudge_2-Tag")) %>%
+  filter(location_long >-4.76 & location_long < -4.755) %>%
+  filter(location_lat > 50.359 & location_lat < 50.364)
+
+font_add_google("Bad Script", "bad_script")
+
+showtext_auto()
+
+# The map requires signing up (for free) to googles map api: https://mapsplatform.google.com/ 
+
+register_google(key = ) #add in your own key here
+
+cbbox <- make_bbox(lon = CTS$location_long, lat = CTS$location_lat, f = .1) #from ggmap
+sq_map <- get_map(location = cbbox, maptype = "satellite", source = "google")
+
+ggmap(sq_map) +
+  geom_path(data = CTS, aes(x = location_long, 
+                            y = location_lat, 
+                            colour = tag_id,  
+                            alpha = 0.75), 
+            size = 2,
+            lineend = "round") +
+  guides(alpha = "none") +
+  scale_color_manual (labels = c("Carrot", "Frank", "Smudge"),
+                      values = c("#ED9121", "#171AEC", "#EC1768")) +
+  labs(title = title,
+       caption = caption) +
+  theme_void() +
+  theme(legend.title = element_blank(),
+        legend.text = element_text(family = "bad_script",
+                                   size = 13),
+        plot.title = element_text(family = "bad_script",
+                                  size = 25,
+                                  hjust = 0.5, 
+                                  vjust = 2),
+        plot.caption = element_text(family = "bad_script", 
+                                    size = 15,
+                                    hjust = 0.5),
+        plot.margin = margin(t = 10, b = 10))
+```
+
+```{r, gt table for cat information}
+
+gt_data <- cats_uk_reference %>%
+  filter(animal_id %in% c("Carrots", "Frank", "Smudge_2")) %>%
+  select(animal_id, animal_sex, age_years, hrs_indoors, prey_p_month) %>%
+  mutate(animal_sex = recode(animal_sex, "m" = "Male")) %>%
+  mutate(animal_id = recode(animal_id, "Smudge_2" = "Smudge"))
+
+gt(gt_data) %>%
+  cols_label(animal_id = "",
+             animal_sex = "Sex",
+             age_years = "Age",
+             hrs_indoors = "Number of hrs indoors",
+             prey_p_month = "Prey per Month") %>%
+  cols_align(align = "center") %>%
+  cols_width(hrs_indoors ~ px(100),
+             prey_p_month ~ px(100)) %>%
+  tab_options(table.border.top.color = "white",
+    table.width = pct(100)) %>%
+  opt_table_font(font = list(google_font(name = "Bad Script")))
+```
