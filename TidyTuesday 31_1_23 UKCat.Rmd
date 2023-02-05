@@ -88,5 +88,5 @@ gt(gt_data) %>%
              prey_p_month ~ px(100)) %>%
   tab_options(table.border.top.color = "white",
     table.width = pct(100)) %>%
-  opt_table_font(font = list(google_font(name = "Bad Script")))
+  opt_table_font(font = list(google_font(name = "helvetica")))
 ```
