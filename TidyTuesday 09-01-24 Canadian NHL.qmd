@@ -1,0 +1,109 @@
+---
+title: "TidyTuesday 09-01-24 Canadian NHL"
+author: "Dr Richard Clarke"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, packages}
+library(tidyverse)
+library(car)
+library(rstatix)
+library(broom)
+
+```
+
+```{r, read in data}
+canada_births_1991_2022 <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-09/canada_births_1991_2022.csv')
+nhl_player_births <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-09/nhl_player_births.csv')
+nhl_rosters <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-09/nhl_rosters.csv')
+nhl_teams <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-09/nhl_teams.csv')
+```
+
+```{r, bmi calculation}
+
+nhl_bmi <- nhl_rosters %>%
+  mutate(height_in_meters = height_in_centimeters/100) %>%
+  mutate(bmi = weight_in_kilograms / height_in_meters^2)
+  
+
+nhl_bmi <- nhl_bmi %>%
+  mutate(bmi_cat = case_when(bmi < 18.5 ~ "Underweight",
+                             bmi >=18.5 & bmi <25 ~ "Healthy range",
+                             bmi >=25 & bmi < 30 ~ "Overweight",
+                             bmi >= 30 & bmi < 40 ~ "Obese",
+                             bmi >= 40 ~ "Severely Obese"))
+
+```
+
+```{r, anova assumpation checks}
+nhl_bmi %>%
+  ggplot(aes(sample = bmi)) +
+  facet_wrap(~ position_type) +
+  geom_qq() +
+  geom_qq_line()
+
+levenes <- leveneTest(bmi ~ position_type, data = nhl_bmi)
+
+```
+
+```{r, kruskal-Wallis}
+
+kruskal_result <- kruskal.test(bmi ~ position_type, data = nhl_bmi) %>%
+  tidy()
+
+post_hoc <- nhl_bmi %>%
+    pairwise_wilcox_test(bmi ~ position_type, p.adjust.method = "bonferroni")
+
+```
+
+```{r, caption for figure}
+
+lev_stat <- levenes$`F value`[1] 
+lev_pvalue <- levenes$`Pr(>F)`[1] 
+lev_pvalue <- ifelse(lev_pvalue < 0.001, "< 0.001", sprintf("= %.3f", lev_pvalue))
+lev_df1 <- levenes$Df[1]
+lev_df2 <- levenes$Df[2]
+
+kw_df <- kruskal_result$parameter
+kw_stat <- kruskal_result$statistic
+kw_pvalue <- kruskal_result$p.value
+kw_pvalue <- ifelse(kw_pvalue < 0.001, "< 0.001", sprintf("= %.3f", kw_pvalue))
+
+
+caption <- sprintf("The data violated the statistical assumption of homogenity of variance (F(%d, %d) = %.2f, p %s) therefore a Kruskal Wallis test was conducted.This test deomnstrated a significant difference across the condtions (F(%d) = %.2f, p %s) ",
+                   lev_df1,
+                   lev_df2,
+                   lev_stat, 
+                   lev_pvalue,
+                   kw_df,
+                   kw_stat,
+                   kw_pvalue)
+caption
+```
+
+```{r, bmi plot}
+
+plot<- nhl_bmi %>%
+  ggplot(aes(x = bmi, y = position_type, fill = position_type)) +
+  geom_violin(alpha = 0.5) +
+  geom_boxplot(width = 0.25) +
+  scale_fill_manual(values = c("#D52B1E", "#FFD700", "#228B22")) +
+  xlab("Body Mass Index (BMI)") +
+  ylab("Position") +
+  ggtitle("BMI difference across position in the NHL. An analysis of N=54,883 players.") +
+  labs(caption = str_wrap(caption)) +
+  theme_classic()+
+  theme(legend.position = "none",
+        plot.caption = element_text(size = 12,
+                                    hjust = 0,
+                                    margin = margin(t = 10),
+                                    lineheight = 1.5))
+```
+
+```{r}
+ggsave(plot, "TidyTuesday 09-01-24 Canadian NHL.png")
+
+```
