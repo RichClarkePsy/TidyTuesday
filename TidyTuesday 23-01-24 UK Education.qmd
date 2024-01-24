@@ -1,0 +1,69 @@
+---
+title: "TidyTuesday 23-01-24 UK Education"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, packages}
+library(tidyverse)
+library(sf)
+library(tmap)
+library(grid)
+```
+
+```{r, read in the data}
+english_education <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-23/english_education.csv')
+
+```
+
+```{r, map and data prep}
+
+# shape file needed
+
+regions <- st_read("NUTS_Level_1_January_2018_GCB_in_the_United_Kingdom.shp")
+
+filtered_map <- regions %>%
+   filter(!nuts118nm %in% c("Scotland", "Wales", "Northern Ireland"))
+
+english_education <- english_education %>%
+  mutate(region = recode(rgn11nm, 
+                            "East of England" = "East of England",
+                            "North West" = "North West (England)",
+                            "North East" = "North East (England)",
+                            "East Midlands" =  "East Midlands (England)",
+                            "West Midlands" = "West Midlands (England)",
+                            "South East" = "South East (England)",
+                            "South West" = "South West (England)"))
+
+```
+
+```{r, choropleth map}
+
+KS4_data <- english_education %>%
+  group_by(region) %>%
+  summarise(KS4score = mean(key_stage_4_attainment_school_year_2012_to_2013)) %>%
+  select(region, KS4score)
+
+
+merged_data <- merge(filtered_map, KS4_data, by.x = "nuts118nm", by.y = "region")
+
+percent_label <- function(x) {
+  paste0(x, "%")
+}
+
+caption <- textGrob("The map shows the\n proportion of pupils\n that achieved 5\n GCSE or more,\n including English and\n Maths, with grades\n A*-C in the 2012 to\n 2013 school year",
+                    x = -20, hjust = 0, vjust = 0.3, gp = gpar(fontface = "italic"))
+merged_data %>%
+  ggplot() +
+  geom_sf(aes(fill = KS4score), color = "black") +
+  scale_fill_gradientn(colours = c("darkred", "gold"),
+                       name = "Percentage of Pupils",
+                       labels = percent_label) +
+  labs(title = "Figure 1. Proportion of of pupils that achieved 5 GCSE or more") +
+  theme_void() +
+  annotation_custom(grob = caption, xmin = -Inf, xmax = -Inf, ymin = -Inf, ymax = Inf) +
+  theme(plot.title = element_text(face = "bold", size = 14))
+
+```
