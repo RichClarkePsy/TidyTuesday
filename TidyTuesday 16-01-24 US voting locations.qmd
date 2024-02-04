@@ -1,0 +1,81 @@
+---
+title: "TidyTuesday 16-01-24 US voting locations"
+author: "Dr Richard Clarke"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, packages}
+library(tidyverse)
+library(sf)
+```
+
+```{r, reading in the data}
+polling_places <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-16/polling_places.csv')
+
+pop_data <- read_csv("Louisiana pop.csv") %>%
+  mutate(county_name = str_to_lower(county_name))
+```
+
+```{r, identifying fire stations}
+LA_fire_stations <- polling_places %>%
+  mutate(category = case_when(str_detect(name, "FIRE DEPT|VFD|FIRE STATION") ~ "Fire Stations",
+                              TRUE ~ "Other")) %>%
+  filter(category == "Fire Stations",
+         state == "LA")
+
+LA_fire_stations <- LA_fire_stations %>%
+  mutate(county_name = str_to_lower(county_name)) %>%
+  group_by(county_name) %>%
+  summarise(n = n())
+
+```
+
+```{r, loading map and mapping population}
+
+us_counties <- st_read("us-county-boundaries.shp") %>%
+  filter(stusab == "LA") %>%
+  mutate(county_name = str_to_lower(namelsad))
+
+LA_pop_map_data <- merge(us_counties, pop_data, by.x = "county_name", by.y = "county_name")
+
+LA_pop_map_data %>%
+  ggplot() +
+  geom_sf(aes(fill = pop), color = "black") +
+  scale_color_brewer() +
+  labs(title = "Figure 1. Louisiana population") +
+  theme_void() 
+
+LA_pop_map_data <- LA_pop_map_data %>%
+   mutate(county_name = str_replace_all(county_name, regex(" parish", ignore_case = TRUE), ""))
+
+final_map_data <- merge(LA_pop_map_data, LA_fire_stations, by.x = "county_name", by.y = "county_name")
+final_map_data <- merge(LA_pop_map_data, LA_fire_stations, by = "county_name", all = TRUE)
+
+
+final_map_data <- final_map_data %>%
+  mutate(fire_house_per_10000 = (n/pop)*10000)
+  
+
+```
+
+
+```{r, choropleth map of fire stations per 10,000}
+
+final_map_data %>%
+  ggplot() +
+  geom_sf(aes(fill = fire_house_per_10000), color = "black") +
+  scale_fill_gradientn(colours = c("orange", "darkred"),
+                       name = "Firehouse Polling\nStations Per\n10,000 People",
+                       na.value = "grey") +
+  labs(title = "Louisiana - Firehouse Polling Stations Per 10,000 People") +
+  theme_void() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_curve(aes(x = -090.8, y = 31.6, xend = -091.4, yend = 30.87),
+             curvature = 0.3, color = "black", size = 1, arrow = arrow(type = "closed", 
+                                                                      length = unit(0.015, "npc"))) +
+  annotate("text", x = -090.2, y = 31.5, label = "West Feliciana - 1 firehouse\npolling station for\nevery 175 people", size = 4, color = "black")
+
+```
