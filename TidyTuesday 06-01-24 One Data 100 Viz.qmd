@@ -1,0 +1,201 @@
+---
+title: "TidyTuesday 06-01-24 One Data 100 Viz"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+My aim for this exercise is to recreate 8 plots from here: https://100.datavizproject.com/
+
+```{r, packages}
+library(tidyverse)
+library(png)
+library(patchwork)
+library(waffle)
+library(grid)
+library(gridExtra)
+```
+
+```{r, read in data}
+heritage <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-02-06/heritage.csv')
+
+```
+
+The only part I couldn't replicate was to move the country labels out side of the grid lines
+
+width = 569 height = 604
+
+```{r, viz #1}
+heritage %>%
+  mutate(country = factor(country, levels = c("Sweden", "Denmark", "Norway"))) %>%
+  pivot_longer(cols = 2:3, names_to = "year", values_to = "n") %>%
+  ggplot(aes(x= year, y = n, fill = country)) +
+  geom_col(width = 0.4) +
+  scale_y_continuous(breaks = c(0,5,10,15,20,25,30,35))+
+  geom_text(aes(label = n), position = position_stack(vjust = 0.5), size = 6, colour = "white") + 
+  scale_fill_manual(values = c("#3474dc","#f25545", "#2f3755"))+
+  annotate("text", x = 2.4, y = 25, label = "Sweden", colour = "#3474dc", size = 5) +
+  annotate("text", x = 2.4, y = 13, label = "Denmark", colour = "#f25545", size = 5) +
+  annotate("text", x = 2.4, y = 4, label = "Norway", colour = "#2f3755", size = 5) +
+  annotate("text", x = 1, y = 24, label = "22", size = 7) +
+  annotate("text", x = 2, y = 35, label = "33", size = 7) +
+  labs(x = "",
+       y = "",
+       title = "One Data 100 Viz #1") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.margin = margin(t = 10, r = 10, b = 10, l = 10, unit = "mm"),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+```
+
+Probably a way to do this with out quite so much annotation. width = 467 height = 595
+
+```{r, viz #25}
+library(png)
+my_png <- png::readPNG("flags.png")
+grob <- rasterGrob(my_png, interpolate = TRUE)
+
+heritage %>%
+  mutate(country = factor(country, levels = c("Norway","Denmark","Sweden"))) %>%
+  pivot_longer(cols = 2:3, names_to = "year", values_to = "n") %>%
+  ggplot(aes(x=year, y = n, fill = country)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.95, alpha = 0.9) +
+  scale_fill_manual(values = c("#2f3755","#f25545","#3474dc")) +
+  theme_void()+
+  theme(legend.position = "none",
+        plot.margin = margin(t = 10, r = 10, b = 40, l = 10, unit = "pt")) +
+  scale_y_continuous(expand = expansion(add = c(0, 5)), limits = c(-5, NA)) +
+  labs(title = "One Data 100 Viz #25")+
+  annotate("text", x = 0.7, y = 1, label = "5", colour = "white", vjust = 1, size = 6) +
+  annotate("text", x = 1.0, y = 1, label = "4", colour = "white", vjust = 1, size = 6) +
+  annotate("text", x = 1.3, y = 1, label = "13", colour = "white", vjust = 1, size = 6) +
+  annotate("text", x = 1.7, y = 1, label = "8", colour = "white", vjust = 1, size = 6) +
+  annotate("text", x = 2.0, y = 1, label = "10", colour = "white", vjust = 1, size = 6) +
+  annotate("text", x = 2.3, y = 1, label = "15", colour = "white", vjust = 1, size = 6) +
+  annotation_custom(grob, xmin = -1, xmax = 3, ymin = -2.5, ymax = -0) +
+  annotation_custom(grob, xmin = -3, xmax = 7, ymin = -2.5, ymax = -0) +
+  annotate("text", x = 1, y = -3.5, label = "2004", colour = "darkgray", vjust = 1, size = 6) +
+  annotate("text", x = 2, y = -3.5, label = "2022", colour = "darkgray", vjust = 1, size = 6) 
+
+# width = 467 height = 595
+
+```
+
+
+```{r, viz #50}
+library(patchwork)
+donut1 <- heritage %>%
+  pivot_longer(cols = 2:3, names_to = "year", values_to = "n") %>%
+  filter(year == "2004") %>%
+  mutate(percentage = n / sum(n) * 100) %>%
+  ggplot(aes(x = "", y = n, fill = country)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("#f25545","#2f3755","#3474dc")) +
+  theme_void() +
+  theme(legend.position = "none",
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_blank()) +
+  geom_text(aes(label = sprintf("%1.1f%%", percentage)), position = position_stack(vjust = 0.5), colour = "white") +
+  annotate("text", x = -0.25, y = 0, label = "2004", size = 7, hjust = 0.5, vjust = 0.5) + 
+  annotate("text", x = 1.8, y = 7, label = "SE", size = 5, hjust = 0.5, vjust = 0.5) +
+  annotate("text", x = 1.8, y = 15, label = "NO", size = 5, hjust = 0.5, vjust = 0.5) +
+  annotate("text", x = 1.8, y = 20, label = "DK", size = 5, hjust = 0.5, vjust = 0.5) 
+
+donut2 <- heritage %>%
+  pivot_longer(cols = 2:3, names_to = "year", values_to = "n") %>%
+  filter(year == "2022") %>%
+  mutate(percentage = n / sum(n) * 100) %>%
+  ggplot(aes(x = "", y = n, fill = country)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("#f25545","#2f3755","#3474dc")) +
+  theme_void() +
+  theme(legend.position = "none",
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_blank()) +
+  geom_text(aes(label = sprintf("%1.1f%%", percentage)), position = position_stack(vjust = 0.5), colour = "white") +
+  annotate("text", x = -0.25, y = 0, label = "2022", size = 7, hjust = 0.5, vjust = 0.5) + 
+  annotate("text", x = 1.8, y = 7, label = "SE", size = 5, hjust = 0.5, vjust = 0.5) +
+  annotate("text", x = 1.8, y = 20, label = "NO", size = 5, hjust = 0.5, vjust = 0.5) +
+  annotate("text", x = 1.8, y = 29, label = "DK", size = 5, hjust = 0.5, vjust = 0.5) 
+
+donuts <- donut1 / donut2 + plot_layout(guides = 'collect') & 
+  plot_annotation(title = "One Data 100 Viz #50")
+
+ggsave("TidyTuesday 06-01-24 One Data 100 Viz #50.png", plot = donuts, width = 4.97, height = 6.89, dpi = 300)
+
+# width = 497 x height = 689
+
+```
+
+```{r, Viz #43}
+library(waffle)
+library(grid)
+
+# waffle chart for 2004
+
+waffle1_data<- heritage %>%
+  mutate(country = factor(country, levels = c("Sweden","Norway","Denmark"))) %>%
+  pivot_longer(cols = 2:3, names_to = "year", values_to = "n") %>%
+  filter(year == "2004") %>%
+  arrange(desc(n))
+
+waffle1_data <- setNames(waffle1_data$n, waffle1_data$country)
+
+waffle1 <- waffle(waffle1_data, 
+       rows = 5, 
+       flip = TRUE,
+       colors = c("#3474dc", "#2f3755", "#f25545"),
+       legend_pos = "none",
+       size = 1)
+
+# waffle chart for 2022
+
+waffle2_data <- heritage %>%
+  mutate(country = factor(country, levels = c("Sweden","Norway","Denmark"))) %>%
+  pivot_longer(cols = 2:3, names_to = "year", values_to = "n") %>%
+  filter(year == "2022") %>%
+  arrange(desc(n))
+
+waffle2_data <- setNames(waffle2_data$n, waffle2_data$country)
+
+waffle2 <- waffle(waffle2_data, 
+       rows = 8, 
+       flip = TRUE,
+       colors = c("#3474dc", "#2f3755", "#f25545"),
+       legend_pos = "none",
+       size = 1)
+
+waffles <- waffle1 + waffle2 + plot_layout(guides = 'collect') 
+
+ggsave("waffles.png", plot = waffles)
+
+waffles <- readPNG("waffles.png")
+
+waffles <- rasterGrob(waffles)
+
+grid.arrange(waffles)
+
+grid.text("One Data 100 Viz #43", x = 0.25, y = 0.75, gp = gpar(fontsize = 18, col = "black"))
+grid.text("2004", x = 0.25, y = 0.30, gp = gpar(fontsize = 15, col = "black"))
+grid.text("2022", x = 0.70, y = 0.30, gp = gpar(fontsize = 15, col = "black"))
+grid.text("Denmark", x = 0.28, y = 0.25, gp = gpar(fontsize = 15, col = "#f25545"))
+grid.text("Norway", x = 0.48, y = 0.25, gp = gpar(fontsize = 15, col = "#2f3755"))
+grid.text("Sweden", x = 0.68, y = 0.25, gp = gpar(fontsize = 15, col = "#3474dc"))
+
+```
