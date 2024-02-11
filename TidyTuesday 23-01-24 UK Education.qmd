@@ -55,15 +55,20 @@ percent_label <- function(x) {
 
 caption <- textGrob("The map shows the\n proportion of pupils\n that achieved 5\n GCSE or more,\n including English and\n Maths, with grades\n A*-C in the 2012 to\n 2013 school year",
                     x = -20, hjust = 0, vjust = 0.3, gp = gpar(fontface = "italic"))
-merged_data %>%
+plot1 <- merged_data %>%
   ggplot() +
   geom_sf(aes(fill = KS4score), color = "black") +
-  scale_fill_gradientn(colours = c("darkred", "gold"),
+  scale_fill_gradientn(colours = c("#aad576", "#143601"),
                        name = "Percentage of Pupils",
                        labels = percent_label) +
   labs(title = "Figure 1. Proportion of of pupils that achieved 5 GCSE or more") +
   theme_void() +
   annotation_custom(grob = caption, xmin = -Inf, xmax = -Inf, ymin = -Inf, ymax = Inf) +
-  theme(plot.title = element_text(face = "bold", size = 14))
+  theme(plot.title = element_text(face = "bold", size = 14),
+        plot.background = element_rect(fill = "white", colour = NA),
+        panel.background = element_rect(fill = "white", colour = NA))
+
+
+ggsave("TidyTuesday 23-01-24 UK Education.png", plot = plot1, width = 6.53, height = 5.56, dpi = 300)
 
 ```

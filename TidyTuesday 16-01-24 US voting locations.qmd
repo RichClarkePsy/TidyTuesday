@@ -61,10 +61,9 @@ final_map_data <- final_map_data %>%
 
 ```
 
-
 ```{r, choropleth map of fire stations per 10,000}
 
-final_map_data %>%
+map1 <- final_map_data %>%
   ggplot() +
   geom_sf(aes(fill = fire_house_per_10000), color = "black") +
   scale_fill_gradientn(colours = c("orange", "darkred"),
@@ -72,10 +71,31 @@ final_map_data %>%
                        na.value = "grey") +
   labs(title = "Louisiana - Firehouse Polling Stations Per 10,000 People") +
   theme_void() +
-  theme(plot.title = element_text(hjust = 0.5)) +
   geom_curve(aes(x = -090.8, y = 31.6, xend = -091.4, yend = 30.87),
-             curvature = 0.3, color = "black", size = 1, arrow = arrow(type = "closed", 
-                                                                      length = unit(0.015, "npc"))) +
-  annotate("text", x = -090.2, y = 31.5, label = "West Feliciana - 1 firehouse\npolling station for\nevery 175 people", size = 4, color = "black")
+             curvature = 0.3, 
+             color = "black", 
+             size = 0.5, 
+             arrow = arrow(type = "closed",
+                           length = unit(0.015, "npc"))) +
+  geom_curve(aes(x = -092.8, y = 29.2, xend = -089.9, yend = 30.07),
+             curvature = -0.3, 
+             color = "black", 
+             size = 0.5, 
+             arrow = arrow(type = "closed",
+                           length = unit(0.015, "npc"))) +
+  annotate("text", 
+           x = -090, 
+           y = 31.5, 
+           label = "West Feliciana - 1 firehouse\npolling station for\nevery 175 people", 
+           size = 4, color = "black") +
+  annotate("text", 
+           x = -092.3, 
+           y = 28.95, 
+           label = "Orleans - 1 firehouse polling\nstation for every 77,000 people", 
+           size = 4, color = "black")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.background = element_rect(fill = "white", colour = NA)) 
+
+ggsave("TidyTuesday 16-01-24 US voting locations.png", plot = map1, width = 6.13, height = 5.56, dpi = 300)
 
 ```

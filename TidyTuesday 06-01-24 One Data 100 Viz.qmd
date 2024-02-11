@@ -85,7 +85,6 @@ heritage %>%
 
 ```
 
-
 ```{r, viz #50}
 library(patchwork)
 donut1 <- heritage %>%
