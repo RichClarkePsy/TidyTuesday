@@ -1,0 +1,76 @@
+---
+title: "TidyTuesday 13-02-24 Valentines Day"
+author: "Dr Richard Clarke"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, packages}
+library(tidyverse)
+library(ggthemes)
+```
+
+```{r, read in data}
+
+historical_spending <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-02-13/historical_spending.csv')
+```
+
+```{r}
+plot <- historical_spending %>%
+  select(Year, 4:10) %>%
+  pivot_longer(cols = 2:8, names_to = "type", values_to = "amount") %>%
+  mutate(type = factor(type, levels = c("GreetingCards", 
+                                        "GiftCards", 
+                                        "Candy", 
+                                        "Clothing",
+                                        "Flowers",
+                                        "EveningOut",
+                                        "Jewelry"))) %>%
+  ggplot(aes(x = Year, y = amount, fill = type)) +
+  geom_col() +
+  scale_fill_manual(values = c("Jewelry" = "#f79c18", 
+                               "EveningOut" = "#812e25", 
+                               "Flowers" = "#4f8832", 
+                               "Clothing" = "#300e5b", 
+                               "Candy" = "#ffb9cc", 
+                               "GiftCards" = "#403633", 
+                               "GreetingCards" = "#333333")) +
+  scale_x_continuous(breaks = seq(min(historical_spending$Year), 
+                                  max(historical_spending$Year), by = 1)) +
+  scale_y_continuous(breaks = seq(0, 150, by = 25), limits = c(NA, 190)) +
+  labs(title = "US Valentines Day Spending($)", 
+       fill = "",
+       caption = "Data: National Retail Federation | #TidyTudesday")+
+  geom_curve(aes(x = 2019, y = 170, xend = 2020, yend = 151),
+             curvature = -0.6, 
+             color = "black", 
+             size = 0.5, 
+             arrow = arrow(type = "closed",
+                           length = unit(0.015, "npc"))) +
+    geom_curve(aes(x = 2021.5, y = 185, xend = 2022, yend = 157),
+             curvature = -0.4, 
+             color = "black", 
+             size = 0.5, 
+             arrow = arrow(type = "closed",
+                           length = unit(0.015, "npc"))) +
+  annotate("text", 
+           x = 2017.9, 
+           y = 167, 
+           label = "Fear of being alone\nduring upcoming lockdown", 
+           size = 4, color = "black", family = "sans") +
+  annotate("text", 
+           x = 2020.65, 
+           y = 188, 
+           label = "Post-covid making\nan effort again",
+           size = 4, color = "black", family = "sans") +
+  theme_wsj() +
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        plot.caption = element_text(hjust = 1, vjust = 1, size = 8, color = "grey50")) +
+  guides(fill = guide_legend(nrow = 1))
+
+ggsave("TidyTuesday 13-02-24 Valentines Day.png", plot = plot, width = 9.90, height = 5.21, dpi = 300)
+
+```
